@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
@@ -252,7 +253,26 @@ class _TehillimScreenState extends State<TehillimScreen> {
             }
           },
         );
-        _document = await PdfDocument.openFile(localPath);
+        try {
+          _document = await PdfDocument.openFile(localPath);
+        } catch (openErr) {
+          debugPrint("Failed to open Tehillim PDF, file might be corrupted. Deleting and redownloading: $openErr");
+          final file = File(localPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+          final freshPath = await PdfManager.getPdfPath(
+            filename,
+            onProgress: (progress) {
+              if (mounted) {
+                setState(() {
+                  downloadProgress = progress;
+                });
+              }
+            },
+          );
+          _document = await PdfDocument.openFile(freshPath);
+        }
       }
     } catch (e) {
       debugPrint('Error initializing Tehillim: $e');
