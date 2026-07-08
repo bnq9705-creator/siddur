@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'firebase_options.dart';
 import 'siddur_screen.dart';
 import 'tehillim_screen.dart';
@@ -60,6 +61,9 @@ class SiddurHomePage extends StatefulWidget {
 class _SiddurHomePageState extends State<SiddurHomePage> {
   bool isInIsrael = true;
   DateTime? testDate;
+  bool _isLocked = false;
+  String _lockMessage = '';
+  String _lockStoreUrl = '';
 
   @override
   void initState() {
@@ -72,6 +76,24 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
     setState(() {
       isInIsrael = prefs.getBool('isInIsrael') ?? true;
     });
+
+    try {
+      final manifest = await PdfManager.fetchManifest();
+      if (manifest != null) {
+        final isDisabled = PdfManager.isAppDisabled();
+        final minVersion = PdfManager.getMinVersion();
+        if (isDisabled || PdfManager.currentAppVersion < minVersion) {
+          setState(() {
+            _isLocked = true;
+            _lockMessage = PdfManager.getDisableMessage();
+            _lockStoreUrl = PdfManager.getStoreUrl();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking remote config: $e");
+    }
+
     // בדיקת עדכונים ברשת ברקע
     PdfManager.checkForUpdates();
   }
@@ -388,6 +410,9 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLocked) {
+      return LockoutScreen(message: _lockMessage, storeUrl: _lockStoreUrl);
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("סידור תהלת ה'", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 24)),
@@ -512,6 +537,85 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         autoSpacing: true,
         pageSnap: true,
         pageFling: true,
+      ),
+    );
+  }
+}
+
+class LockoutScreen extends StatelessWidget {
+  final String message;
+  final String storeUrl;
+
+  const LockoutScreen({
+    super.key,
+    required this.message,
+    required this.storeUrl,
+  });
+
+  Future<void> _launchStore() async {
+    if (storeUrl.isNotEmpty) {
+      final uri = Uri.parse(storeUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF8F3),
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 80,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "הודעת מערכת",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4A3B32),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  if (storeUrl.isNotEmpty)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8C6D58),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      onPressed: _launchStore,
+                      child: const Text(
+                        "הורד את הגרסה הרשמית",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

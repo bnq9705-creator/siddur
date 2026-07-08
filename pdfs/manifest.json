@@ -1,5 +1,9 @@
 {
   "manifest_version": 1,
+  "min_version": 1,
+  "is_app_disabled": false,
+  "disable_message": "גרסה זו אינה נתמכת עוד. אנא הורד את הגרסה הרשמית והמעודכנת של הסידור מחנות האפליקציות.",
+  "store_url": "https://play.google.com/store/apps/details?id=com.mendyn.siddur.siddur_app_online",
   "files": {
     "02_shacharit_chol.pdf": { "version": 1, "size_bytes": 13477181, "title": "שחרית לחול" },
     "03_mincha_chol.pdf": { "version": 1, "size_bytes": 1680847, "title": "מנחה לחול" },

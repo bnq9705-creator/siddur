@@ -47,6 +47,29 @@ class PdfManager {
     return null;
   }
 
+  static const int currentAppVersion = 1;
+
+  static int getMinVersion() {
+    if (_remoteManifest == null) return 1;
+    return _remoteManifest!['min_version'] as int? ?? 1;
+  }
+
+  static bool isAppDisabled() {
+    if (_remoteManifest == null) return false;
+    return _remoteManifest!['is_app_disabled'] as bool? ?? false;
+  }
+
+  static String getDisableMessage() {
+    if (_remoteManifest == null) return "הגישה לאפליקציה חסומה זמנית.";
+    return _remoteManifest!['disable_message'] as String? ?? "הגישה לאפליקציה חסומה זמנית.";
+  }
+
+  static String getStoreUrl() {
+    if (_remoteManifest == null) return "";
+    return _remoteManifest!['store_url'] as String? ?? "";
+  }
+
+
   /// בודק אם יש עדכונים לקבצים ברשת, ומוחק קבצים ישנים מקומית כדי שיורדו מחדש
   static Future<void> checkForUpdates() async {
     final manifest = await fetchManifest();
