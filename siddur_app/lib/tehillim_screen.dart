@@ -27,6 +27,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
   double downloadProgress = 0.0;
   bool isDownloading = false;
   int _currentPageIndex = 0;
+  bool _showPromptBanner = true;
 
   final Map<int, List<int>> _dayToChapters = {
     1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -85,6 +86,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
     final dayChapters = _dayToChapters[currentSelectedDay] ?? [];
     final textController = TextEditingController();
     bool showCustomInput = dayChapters.isEmpty;
+    List<int> selectedChapters = [];
 
     showDialog(
       context: context,
@@ -95,7 +97,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
               textDirection: TextDirection.rtl,
               child: AlertDialog(
                 backgroundColor: const Color(0xFFFBF8F3),
-                title: const Text('דיווח על פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
+                title: const Text('מיפוי פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -104,6 +106,11 @@ class _TehillimScreenState extends State<TehillimScreen> {
                       Text(
                         'איזה פרק תהילים מופיע בעמוד זה?\n(עמוד $pdfPageNumber בקובץ)',
                         style: const TextStyle(fontSize: 15, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'ניתן לבחור יותר מפרק אחד אם העמוד מכיל שני פרקים.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
                       ),
                       const SizedBox(height: 16),
                       if (!showCustomInput) ...[
@@ -117,17 +124,25 @@ class _TehillimScreenState extends State<TehillimScreen> {
                           runSpacing: 8,
                           children: dayChapters.map((chapter) {
                             final hebNum = HebrewDateFormatter().formatHebrewNumber(chapter);
-                            return ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF8C6D58),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            final isSelected = selectedChapters.contains(chapter);
+                            return FilterChip(
+                              label: Text('פרק $hebNum ($chapter)'),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF8C6D58).withOpacity(0.2),
+                              checkmarkColor: const Color(0xFF8C6D58),
+                              labelStyle: TextStyle(
+                                color: isSelected ? const Color(0xFF8C6D58) : Colors.black87,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _submitChapterReport(pdfPageNumber, chapter);
+                              onSelected: (selected) {
+                                setDialogState(() {
+                                  if (selected) {
+                                    selectedChapters.add(chapter);
+                                  } else {
+                                    selectedChapters.remove(chapter);
+                                  }
+                                });
                               },
-                              child: Text('פרק $hebNum ($chapter)'),
                             );
                           }).toList(),
                         ),
@@ -160,23 +175,33 @@ class _TehillimScreenState extends State<TehillimScreen> {
                     onPressed: () => Navigator.pop(context),
                     child: const Text('ביטול', style: TextStyle(color: Colors.grey)),
                   ),
-                  if (showCustomInput)
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C6D58)),
-                      onPressed: () {
-                        final text = textController.text.trim();
-                        final chapter = int.tryParse(text);
-                        if (chapter == null || chapter < 1 || chapter > 150) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
-                          );
-                          return;
-                        }
-                        Navigator.pop(context);
-                        _submitChapterReport(pdfPageNumber, chapter);
-                      },
-                      child: const Text('שלח', style: TextStyle(color: Colors.white)),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8C6D58),
+                      foregroundColor: Colors.white,
                     ),
+                    onPressed: (showCustomInput || selectedChapters.isNotEmpty)
+                        ? () async {
+                            Navigator.pop(context);
+                            if (showCustomInput) {
+                              final text = textController.text.trim();
+                              final chapter = int.tryParse(text);
+                              if (chapter == null || chapter < 1 || chapter > 150) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
+                                );
+                                return;
+                              }
+                              _submitChapterReport(pdfPageNumber, chapter);
+                            } else {
+                              for (final ch in selectedChapters) {
+                                _submitChapterReport(pdfPageNumber, ch);
+                              }
+                            }
+                          }
+                        : null,
+                    child: const Text('שלח', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
             );
@@ -396,32 +421,88 @@ class _TehillimScreenState extends State<TehillimScreen> {
       ),
       body: isLoading 
         ? const Center(child: CircularProgressIndicator())
-        : PageView.builder(
-            scrollDirection: Axis.vertical,
-            physics: const BouncingScrollPhysics(), // גלילה קפיצית וקלילה יותר
-            itemCount: pages.length,
-            controller: pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentPageIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              return FutureBuilder<Uint8List?>(
-                future: _renderPage(pages[index]),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!snapshot.hasData) return const Center(child: Text('שגיאה בטעינה'));
-                  return Center( // מוודא שהדף יהיה במרכז המסך
-                    child: InteractiveViewer(
-                      child: Image.memory(snapshot.data!, fit: BoxFit.contain),
-                    ),
+        : Stack(
+            children: [
+              PageView.builder(
+                scrollDirection: Axis.vertical,
+                physics: const BouncingScrollPhysics(), // גלילה קפיצית וקלילה יותר
+                itemCount: pages.length,
+                controller: pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPageIndex = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  return FutureBuilder<Uint8List?>(
+                    future: _renderPage(pages[index]),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData) return const Center(child: Text('שגיאה בטעינה'));
+                      return Center( // מוודא שהדף יהיה במרכז המסך
+                        child: InteractiveViewer(
+                          child: Image.memory(snapshot.data!, fit: BoxFit.contain),
+                        ),
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+              if (_showPromptBanner)
+                Positioned(
+                  top: 12,
+                  left: 16,
+                  right: 16,
+                  child: Card(
+                    elevation: 3,
+                    color: Colors.white.withOpacity(0.95),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFFE6DFD5), width: 1),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.help_outline, color: Color(0xFF8C6D58), size: 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'עזור לנו: איזה פרק מופיע בעמוד זה (עמוד ${pages[_currentPageIndex]})?',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4A3B32)),
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFF8C6D58),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onPressed: _reportChapter,
+                            child: const Text('בחר פרק', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                _showPromptBanner = false;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Container(
