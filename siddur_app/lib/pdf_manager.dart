@@ -107,8 +107,27 @@ class PdfManager {
     return await file.exists() && await file.length() > 1000;
   }
 
+  static final Map<String, Future<String>> _activeDownloads = {};
+
   /// מחזיר את הנתיב המקומי של הקובץ. אם הוא לא קיים - מוריד אותו מיידית עם תמיכה באחוזים.
-  static Future<String> getPdfPath(String fileName, {void Function(double progress)? onProgress}) async {
+  static Future<String> getPdfPath(String fileName, {void Function(double progress)? onProgress}) {
+    if (_activeDownloads.containsKey(fileName)) {
+      return _activeDownloads[fileName]!;
+    }
+
+    final future = _getPdfPathImpl(fileName, onProgress: onProgress);
+    _activeDownloads[fileName] = future;
+
+    future.then((_) {
+      _activeDownloads.remove(fileName);
+    }).catchError((_) {
+      _activeDownloads.remove(fileName);
+    });
+
+    return future;
+  }
+
+  static Future<String> _getPdfPathImpl(String fileName, {void Function(double progress)? onProgress}) async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/$fileName");
 
@@ -116,8 +135,27 @@ class PdfManager {
       return file.path;
     }
 
-    await downloadFile(fileName, file, onProgress: onProgress);
-    return file.path;
+    final tempFile = File("${dir.path}/$fileName.temp");
+    try {
+      await downloadFile(fileName, tempFile, onProgress: onProgress);
+      
+      // Rename temp file to final destination on successful download completion
+      if (await tempFile.exists()) {
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await tempFile.rename(file.path);
+      }
+      return file.path;
+    } catch (e) {
+      // Clean up temp file if download fails
+      if (await tempFile.exists()) {
+        try {
+          await tempFile.delete();
+        } catch (_) {}
+      }
+      rethrow;
+    }
   }
 
   /// מוריד קובץ בודד מהשרת ושומר אותו מקומית עם מעקב אחוזים
