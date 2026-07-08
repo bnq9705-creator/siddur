@@ -28,77 +28,159 @@ class _TehillimScreenState extends State<TehillimScreen> {
   bool isDownloading = false;
   int _currentPageIndex = 0;
 
+  final Map<int, List<int>> _dayToChapters = {
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    2: [10, 11, 12, 13, 14, 15, 16, 17],
+    3: [18, 19, 20, 21, 22],
+    4: [23, 24, 25, 26, 27, 28],
+    5: [29, 30, 31, 32, 33, 34],
+    6: [35, 36, 37, 38],
+    7: [39, 40, 41, 42, 43],
+    8: [44, 45, 46, 47, 48],
+    9: [49, 50, 51, 52, 53, 54],
+    10: [55, 56, 57, 58, 59],
+    11: [60, 61, 62, 63, 64, 65],
+    12: [66, 67, 68],
+    13: [69, 70, 71],
+    14: [72, 73, 74, 75, 76],
+    15: [77, 78],
+    16: [79, 80, 81, 82],
+    17: [83, 84, 85, 86, 87],
+    18: [88, 89],
+    19: [90, 91, 92, 93, 94, 95, 96],
+    20: [97, 98, 99, 100, 101, 102, 103],
+    21: [104, 105],
+    22: [106, 107],
+    23: [108, 109, 110, 111, 112],
+    24: [113, 114, 115, 116, 117, 118],
+    25: [119],
+    26: [119],
+    27: [120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134],
+    28: [135, 136, 137, 138, 139],
+    29: [140, 141, 142, 143, 144],
+    30: [145, 146, 147, 148, 149, 150],
+  };
+
+  void _submitChapterReport(int pdfPageNumber, int chapter) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    try {
+      await FirebaseFirestore.instance.collection('tehillim_mappings').add({
+        'pageNumber': pdfPageNumber,
+        'chapter': chapter,
+        'reportedBy': FirebaseAuth.instance.currentUser?.email ?? 'anonymous',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('תודה! הדיווח התקבל וייבדק בהקדם.')),
+      );
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('שגיאה בשליחת הדיווח: $e')),
+      );
+    }
+  }
+
   void _reportChapter() {
     final pdfPageNumber = pages[_currentPageIndex];
-    final controller = TextEditingController();
+    final dayChapters = _dayToChapters[currentSelectedDay] ?? [];
+    final textController = TextEditingController();
+    bool showCustomInput = dayChapters.isEmpty;
 
     showDialog(
       context: context,
       builder: (context) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            backgroundColor: const Color(0xFFFBF8F3),
-            title: const Text('דיווח על פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'איזה פרק תהילים מופיע בעמוד זה?\n(עמוד $pdfPageNumber בקובץ)',
-                  style: const TextStyle(fontSize: 15, color: Colors.black87),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'מספר הפרק (1 עד 150)',
-                    border: OutlineInputBorder(),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: AlertDialog(
+                backgroundColor: const Color(0xFFFBF8F3),
+                title: const Text('דיווח על פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'איזה פרק תהילים מופיע בעמוד זה?\n(עמוד $pdfPageNumber בקובץ)',
+                        style: const TextStyle(fontSize: 15, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 16),
+                      if (!showCustomInput) ...[
+                        Text(
+                          'בחר מתוך פרקי היום (יום ${getHebrewDay(currentSelectedDay)} בחודש):',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF8C6D58)),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: dayChapters.map((chapter) {
+                            final hebNum = HebrewDateFormatter().formatHebrewNumber(chapter);
+                            return ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8C6D58),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _submitChapterReport(pdfPageNumber, chapter);
+                              },
+                              child: Text('פרק $hebNum ($chapter)'),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                showCustomInput = true;
+                              });
+                            },
+                            child: const Text('דווח על פרק אחר...', style: TextStyle(color: Color(0xFF8C6D58), decoration: TextDecoration.underline)),
+                          ),
+                        ),
+                      ] else ...[
+                        TextField(
+                          controller: textController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'מספר הפרק (1 עד 150)',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('ביטול', style: TextStyle(color: Colors.grey)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('ביטול', style: TextStyle(color: Colors.grey)),
+                  ),
+                  if (showCustomInput)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C6D58)),
+                      onPressed: () {
+                        final text = textController.text.trim();
+                        final chapter = int.tryParse(text);
+                        if (chapter == null || chapter < 1 || chapter > 150) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
+                          );
+                          return;
+                        }
+                        Navigator.pop(context);
+                        _submitChapterReport(pdfPageNumber, chapter);
+                      },
+                      child: const Text('שלח', style: TextStyle(color: Colors.white)),
+                    ),
+                ],
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C6D58)),
-                onPressed: () async {
-                  final text = controller.text.trim();
-                  final chapter = int.tryParse(text);
-                  if (chapter == null || chapter < 1 || chapter > 150) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
-                    );
-                    return;
-                  }
-
-                  Navigator.pop(context);
-                  final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                  try {
-                    await FirebaseFirestore.instance.collection('tehillim_mappings').add({
-                      'pageNumber': pdfPageNumber,
-                      'chapter': chapter,
-                      'reportedBy': FirebaseAuth.instance.currentUser?.email ?? 'anonymous',
-                      'timestamp': FieldValue.serverTimestamp(),
-                    });
-                    scaffoldMessenger.showSnackBar(
-                      const SnackBar(content: Text('תודה! הדיווח התקבל וייבדק בהקדם.')),
-                    );
-                  } catch (e) {
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(content: Text('שגיאה בשליחת הדיווח: $e')),
-                    );
-                  }
-                },
-                child: const Text('שלח', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
