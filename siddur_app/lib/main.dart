@@ -145,6 +145,12 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
                       "הורדה: ${(progress * 100).toInt()}%",
                       style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "טעינה ראשונית בלבד - בפעמים הבאות ייפתח מיד",
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
               ),

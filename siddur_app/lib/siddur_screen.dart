@@ -251,6 +251,11 @@ class _SiddurScreenState extends State<SiddurScreen> {
                     "${(downloadProgress * 100).toInt()}%",
                     style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
                   ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    "טעינה ראשונית בלבד - בפעמים הבאות ייפתח מיידית",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
               ],
             ),
