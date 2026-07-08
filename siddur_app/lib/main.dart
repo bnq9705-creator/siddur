@@ -422,7 +422,7 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text("סידור תהלת ה'", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 24)),
+        title: const Text("סידור תהלת ה' 🌟", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 24)),
         centerTitle: true,
         backgroundColor: const Color(0xFFEFE9E1),
         elevation: 2,
