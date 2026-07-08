@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -422,7 +422,7 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text("סידור תהלת ה' 🌟", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 24)),
+        title: const Text("סידור תהלת ה'", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 24)),
         centerTitle: true,
         backgroundColor: const Color(0xFFEFE9E1),
         elevation: 2,
@@ -532,6 +532,21 @@ class PdfViewerScreen extends StatefulWidget {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   int _currentPage = 1;
+  late PdfController _pdfController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pdfController = PdfController(
+      document: PdfDocument.openFile(widget.filePath),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pdfController.dispose();
+    super.dispose();
+  }
 
   void _reportChapter() {
     final pdfPageNumber = _currentPage;
@@ -628,17 +643,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ]
             : null,
       ),
-      body: PDFView(
-        filePath: widget.filePath,
-        autoSpacing: true,
-        pageSnap: true,
-        pageFling: true,
-        onPageChanged: (page, total) {
-          if (page != null) {
-            setState(() {
-              _currentPage = page + 1;
-            });
-          }
+      body: PdfView(
+        controller: _pdfController,
+        onPageChanged: (page) {
+          setState(() {
+            _currentPage = page;
+          });
         },
       ),
     );
