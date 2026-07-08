@@ -236,7 +236,7 @@ class _SiddurScreenState extends State<SiddurScreen> {
                 const CircularProgressIndicator(color: Color(0xFF8C6D58)),
                 const SizedBox(height: 30),
                 Text(
-                  isDownloading ? "מוריד קבצי תפילה..." : "טוען סידור...",
+                  "טוען תפילה...",
                   style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 18),
                 ),
                 if (isDownloading) ...[

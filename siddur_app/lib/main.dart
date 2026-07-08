@@ -461,7 +461,7 @@ class _SiddurHomePageState extends State<SiddurHomePage> {
                       try {
                         final localPath = await _runWithDownloadProgressDialog(
                           task: (onProgress) => PdfManager.getPdfPath(item["file"]!, onProgress: onProgress),
-                          message: "מוריד תפילה...",
+                          message: "טוען תפילה...",
                         );
                         navigator.push(MaterialPageRoute(builder: (context) => PdfViewerScreen(title: item["title"]!, filePath: localPath)));
                       } catch (e) {

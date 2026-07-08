@@ -180,7 +180,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
                 const CircularProgressIndicator(color: Color(0xFF8C6D58)),
                 const SizedBox(height: 30),
                 Text(
-                  isDownloading ? "מוריד קובץ תהילים..." : "טוען תהילים...",
+                  "טוען תהילים...",
                   style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 18),
                 ),
                 if (isDownloading) ...[
