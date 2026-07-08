@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'firebase_options.dart';
 import 'siddur_screen.dart';
@@ -524,19 +525,115 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
+  int _currentPage = 1;
+
+  void _reportChapter() {
+    final pdfPageNumber = _currentPage;
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFFFBF8F3),
+            title: const Text('דיווח על פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'איזה פרק תהילים מופיע בעמוד זה?\n(עמוד $pdfPageNumber בספר)',
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'מספר הפרק (1 עד 150)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ביטול', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C6D58)),
+                onPressed: () async {
+                  final text = controller.text.trim();
+                  final chapter = int.tryParse(text);
+                  if (chapter == null || chapter < 1 || chapter > 150) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                  try {
+                    await FirebaseFirestore.instance.collection('tehillim_mappings').add({
+                      'pageNumber': pdfPageNumber,
+                      'chapter': chapter,
+                      'reportedBy': FirebaseAuth.instance.currentUser?.email ?? 'anonymous',
+                      'timestamp': FieldValue.serverTimestamp(),
+                    });
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(content: Text('תודה! הדיווח התקבל וייבדק בהקדם.')),
+                    );
+                  } catch (e) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(content: Text('שגיאה בשליחת הדיווח: $e')),
+                    );
+                  }
+                },
+                child: const Text('שלח', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showReportButton = widget.title.contains('תהילים') || widget.filePath.endsWith('tehillim.pdf');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title, style: const TextStyle(color: Color(0xFF4A3B32), fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFEFE9E1),
         iconTheme: const IconThemeData(color: Color(0xFF4A3B32)),
+        actions: showReportButton
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.edit_note, color: Color(0xFF8C6D58)),
+                  onPressed: _reportChapter,
+                  tooltip: 'דווח על פרק',
+                ),
+              ]
+            : null,
       ),
       body: PDFView(
         filePath: widget.filePath,
         autoSpacing: true,
         pageSnap: true,
         pageFling: true,
+        onPageChanged: (page, total) {
+          if (page != null) {
+            setState(() {
+              _currentPage = page + 1;
+            });
+          }
+        },
       ),
     );
   }

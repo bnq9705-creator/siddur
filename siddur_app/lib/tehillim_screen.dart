@@ -5,6 +5,8 @@ import 'package:kosher_dart/kosher_dart.dart';
 import 'tehillim_data.dart';
 import 'prayer_engine.dart';
 import 'pdf_manager.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TehillimScreen extends StatefulWidget {
   final DateTime? simulatedDate;
@@ -24,6 +26,83 @@ class _TehillimScreenState extends State<TehillimScreen> {
 
   double downloadProgress = 0.0;
   bool isDownloading = false;
+  int _currentPageIndex = 0;
+
+  void _reportChapter() {
+    final pdfPageNumber = pages[_currentPageIndex];
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFFFBF8F3),
+            title: const Text('דיווח על פרק תהילים', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32))),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'איזה פרק תהילים מופיע בעמוד זה?\n(עמוד $pdfPageNumber בקובץ)',
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'מספר הפרק (1 עד 150)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ביטול', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8C6D58)),
+                onPressed: () async {
+                  final text = controller.text.trim();
+                  final chapter = int.tryParse(text);
+                  if (chapter == null || chapter < 1 || chapter > 150) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('נא להזין מספר פרק תקין בין 1 ל-150')),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                  try {
+                    await FirebaseFirestore.instance.collection('tehillim_mappings').add({
+                      'pageNumber': pdfPageNumber,
+                      'chapter': chapter,
+                      'reportedBy': FirebaseAuth.instance.currentUser?.email ?? 'anonymous',
+                      'timestamp': FieldValue.serverTimestamp(),
+                    });
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(content: Text('תודה! הדיווח התקבל וייבדק בהקדם.')),
+                    );
+                  } catch (e) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(content: Text('שגיאה בשליחת הדיווח: $e')),
+                    );
+                  }
+                },
+                child: const Text('שלח', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -219,6 +298,11 @@ class _TehillimScreenState extends State<TehillimScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note, color: Color(0xFF8C6D58)),
+            onPressed: _reportChapter,
+            tooltip: 'דווח על הפרק בעמוד זה',
+          ),
           IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeDay(1)),
           IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeDay(-1)),
         ],
@@ -230,6 +314,11 @@ class _TehillimScreenState extends State<TehillimScreen> {
             physics: const BouncingScrollPhysics(), // גלילה קפיצית וקלילה יותר
             itemCount: pages.length,
             controller: pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPageIndex = index;
+              });
+            },
             itemBuilder: (context, index) {
               return FutureBuilder<Uint8List?>(
                 future: _renderPage(pages[index]),
