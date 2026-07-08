@@ -1,0 +1,14 @@
+{
+  "manifest_version": 1,
+  "files": {
+    "02_shacharit_chol.pdf": { "version": 1, "size_bytes": 13477181, "title": "שחרית לחול" },
+    "03_mincha_chol.pdf": { "version": 1, "size_bytes": 1680847, "title": "מנחה לחול" },
+    "04_arvit_chol.pdf": { "version": 1, "size_bytes": 2079834, "title": "ערבית לחול" },
+    "05_kriat_shema_mita.pdf": { "version": 1, "size_bytes": 1101005, "title": "קריאת שמע על המיטה" },
+    "birkat_amazon.pdf": { "version": 1, "size_bytes": 1122663, "title": "ברכת המזון" },
+    "rosh_chodesh.pdf": { "version": 1, "size_bytes": 693483, "title": "ראש חודש" },
+    "special_readings.pdf": { "version": 1, "size_bytes": 6785921, "title": "קריאות מיוחדות" },
+    "tehillim.pdf": { "version": 1, "size_bytes": 19525873, "title": "תהילים" },
+    "torah_readings.pdf": { "version": 1, "size_bytes": 5072797, "title": "קריאת התורה" }
+  }
+}

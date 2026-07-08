@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "481912169536",
+    "project_id": "siddur-app-7b74e",
+    "storage_bucket": "siddur-app-7b74e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481912169536:android:b89eaa0cb62727b8c8eba5",
+        "android_client_info": {
+          "package_name": "com.mendyn.siddur.siddur_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBi9PM9mABIPP0W7ZM9egztSv5e8XdeG5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481912169536:android:98c54fc14cd9411ec8eba5",
+        "android_client_info": {
+          "package_name": "com.mendyn.siddur.siddur_app_online"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBi9PM9mABIPP0W7ZM9egztSv5e8XdeG5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -4,12 +4,14 @@ import 'package:pdfx/pdfx.dart';
 import 'package:kosher_dart/kosher_dart.dart';
 import 'tehillim_data.dart';
 import 'prayer_engine.dart';
+import 'pdf_manager.dart';
 
 class TehillimScreen extends StatefulWidget {
-  const TehillimScreen({Key? key}) : super(key: key);
+  final DateTime? simulatedDate;
+  const TehillimScreen({super.key, this.simulatedDate});
 
   @override
-  _TehillimScreenState createState() => _TehillimScreenState();
+  State<TehillimScreen> createState() => _TehillimScreenState();
 }
 
 class _TehillimScreenState extends State<TehillimScreen> {
@@ -20,32 +22,60 @@ class _TehillimScreenState extends State<TehillimScreen> {
   final PageController pageController = PageController();
   int currentSelectedDay = 1;
 
+  double downloadProgress = 0.0;
+  bool isDownloading = false;
+
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = widget.simulatedDate ?? DateTime.now();
     final jCal = JewishCalendar.fromDateTime(now);
     currentSelectedDay = jCal.getJewishDayOfMonth();
     _initTehillim();
   }
 
   Future<void> _initTehillim() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      isDownloading = false;
+      downloadProgress = 0.0;
+    });
     try {
-      // כאן אנחנו משתמשים ביום שנבחר (או היום הנוכחי כברירת מחדל)
       pages = List.from(tehillimMap[currentSelectedDay] ?? []);
       
-      // בדיקה אם היום הנבחר הוא כ"ט ויש צורך להוסיף את ל' (במידה והמשתמש בחר "היום" וזה חודש חסר)
-      // לצורך הפשטות בבחירה ידנית, ניתן למשתמש לבחור פשוט 1-30.
-      
+      // איפוס המיקום של ה-PageView להתחלה
+      if (pageController.hasClients) {
+        pageController.jumpToPage(0);
+      }
+
       if (_document == null) {
-        _document = await PdfDocument.openAsset(PrayerEngine.tehillimPdf);
+        final filename = PrayerEngine.tehillimPdf.split('/').last;
+        final isDownloaded = await PdfManager.isFileDownloaded(filename);
+        if (!isDownloaded) {
+          setState(() {
+            isDownloading = true;
+          });
+        }
+        final localPath = await PdfManager.getPdfPath(
+          filename,
+          onProgress: (progress) {
+            if (mounted) {
+              setState(() {
+                downloadProgress = progress;
+              });
+            }
+          },
+        );
+        _document = await PdfDocument.openFile(localPath);
       }
     } catch (e) {
       debugPrint('Error initializing Tehillim: $e');
     } finally {
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+          isDownloading = false;
+        });
       }
     }
   }
@@ -59,7 +89,11 @@ class _TehillimScreenState extends State<TehillimScreen> {
   }
 
   Future<Uint8List?> _renderPage(int pageNumber) async {
-    if (_imageCache.containsKey(pageNumber)) return _imageCache[pageNumber];
+    if (_imageCache.containsKey(pageNumber)) {
+      final bytes = _imageCache.remove(pageNumber)!;
+      _imageCache[pageNumber] = bytes;
+      return bytes;
+    }
     if (_document == null) return null;
 
     try {
@@ -72,6 +106,9 @@ class _TehillimScreenState extends State<TehillimScreen> {
       );
       await page.close();
       if (pageImage != null) {
+        if (_imageCache.length >= 10) {
+          _imageCache.remove(_imageCache.keys.first);
+        }
         _imageCache[pageNumber] = pageImage.bytes;
         return pageImage.bytes;
       }
@@ -99,7 +136,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) {
-        return Container(
+        return SizedBox(
           height: 300,
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
@@ -132,7 +169,38 @@ class _TehillimScreenState extends State<TehillimScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading && _document == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: const Color(0xFFFBF8F3),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF8C6D58)),
+                const SizedBox(height: 30),
+                Text(
+                  isDownloading ? "מוריד קובץ תהילים..." : "טוען תהילים...",
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4A3B32), fontSize: 18),
+                ),
+                if (isDownloading) ...[
+                  const SizedBox(height: 15),
+                  LinearProgressIndicator(
+                    value: downloadProgress,
+                    color: const Color(0xFF8C6D58),
+                    backgroundColor: const Color(0xFFE6DFD5),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "${(downloadProgress * 100).toInt()}%",
+                    style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -159,6 +227,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
         ? const Center(child: CircularProgressIndicator())
         : PageView.builder(
             scrollDirection: Axis.vertical,
+            physics: const BouncingScrollPhysics(), // גלילה קפיצית וקלילה יותר
             itemCount: pages.length,
             controller: pageController,
             itemBuilder: (context, index) {
@@ -169,8 +238,10 @@ class _TehillimScreenState extends State<TehillimScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (!snapshot.hasData) return const Center(child: Text('שגיאה בטעינה'));
-                  return InteractiveViewer(
-                    child: Image.memory(snapshot.data!, fit: BoxFit.contain),
+                  return Center( // מוודא שהדף יהיה במרכז המסך
+                    child: InteractiveViewer(
+                      child: Image.memory(snapshot.data!, fit: BoxFit.contain),
+                    ),
                   );
                 },
               );
@@ -181,7 +252,7 @@ class _TehillimScreenState extends State<TehillimScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16.0),
         child: FloatingActionButton.extended(
           onPressed: () {},
-          backgroundColor: const Color(0xFFEFE9E1).withOpacity(0.9),
+          backgroundColor: const Color(0xFFEFE9E1).withValues(alpha: 0.9),
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30), side: const BorderSide(color: Color(0xFF8C6D58), width: 1.5)),
           label: const Text("יחי אדוננו מורנו ורבינו מלך המשיח לעולם ועד", style: TextStyle(color: Color(0xFF4A3B32), fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center),

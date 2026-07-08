@@ -1,0 +1,6 @@
+# Ignore PDF backup folder
+raw_pdfs_backup/
+siddur_compressed_source.pdf
+siddur.pdf
+.DS_Store
+build/
